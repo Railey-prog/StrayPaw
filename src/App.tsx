@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ReportProvider } from './context/ReportContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { ThemeProvider } from './context/ThemeContext';
 // Components
 import { Layout } from './components/Layout';
 // Pages
@@ -41,76 +42,78 @@ function AdminOnly({ children }: {children: ReactNode;}) {
 }
 export function App() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <ReportProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* Public landing + auth pages — no sidebar */}
-              <Route
-                path="/"
-                element={
-                <PublicOnly>
-                    <Landing />
-                  </PublicOnly>
-                } />
-              
-              <Route
-                path="/login"
-                element={
-                <PublicOnly>
-                    <Login />
-                  </PublicOnly>
-                } />
-              
-              <Route
-                path="/register"
-                element={
-                <PublicOnly>
-                    <Register />
-                  </PublicOnly>
-                } />
-              
-
-              {/* App routes — protected, wrapped in dashboard Layout */}
-              <Route
-                element={
-                <Protected>
-                    <Layout />
-                  </Protected>
-                }>
-                
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/map" element={<MapPage />} />
-                <Route path="/report" element={<ReportForm />} />
-                <Route path="/reports" element={<ReportsList />} />
-                <Route path="/reports/:id" element={<ReportDetail />} />
-                <Route path="/reports/:id/edit" element={<ReportForm />} />
-                <Route path="/my-reports" element={<MyReports />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <ReportProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* Public landing + auth pages — no sidebar */}
                 <Route
-                  path="/admin"
+                  path="/"
                   element={
-                  <AdminOnly>
-                      <AdminDashboard />
-                    </AdminOnly>
+                  <PublicOnly>
+                      <Landing />
+                    </PublicOnly>
                   } />
                 
                 <Route
-                  path="/admin/users"
+                  path="/login"
                   element={
-                  <AdminOnly>
-                      <AdminUsers />
-                    </AdminOnly>
+                  <PublicOnly>
+                      <Login />
+                    </PublicOnly>
                   } />
                 
-              </Route>
+                <Route
+                  path="/register"
+                  element={
+                  <PublicOnly>
+                      <Register />
+                    </PublicOnly>
+                  } />
+                
 
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </ReportProvider>
-      </NotificationProvider>
-    </AuthProvider>);
+                {/* App routes — protected, wrapped in dashboard Layout */}
+                <Route
+                  element={
+                  <Protected>
+                      <Layout />
+                    </Protected>
+                  }>
+                  
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/map" element={<MapPage />} />
+                  <Route path="/report" element={<ReportForm />} />
+                  <Route path="/reports" element={<ReportsList />} />
+                  <Route path="/reports/:id" element={<ReportDetail />} />
+                  <Route path="/reports/:id/edit" element={<ReportForm />} />
+                  <Route path="/my-reports" element={<MyReports />} />
+                  <Route
+                    path="/admin"
+                    element={
+                    <AdminOnly>
+                        <AdminDashboard />
+                      </AdminOnly>
+                    } />
+                  
+                  <Route
+                    path="/admin/users"
+                    element={
+                    <AdminOnly>
+                        <AdminUsers />
+                      </AdminOnly>
+                    } />
+                  
+                </Route>
+
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </ReportProvider>
+        </NotificationProvider>
+      </AuthProvider>
+    </ThemeProvider>);
 
 }
