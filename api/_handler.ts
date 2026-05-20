@@ -5,7 +5,7 @@ let booted = false;
 
 export default async function handler(req: any, res: any) {
   if (!booted) {
-    const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || '';
+    const dbUrl = process.env.SUPABASE_DB_URL || '';
     const jwtSecret = process.env.JWT_SECRET || '';
 
     console.log('[boot] DB URL set:', !!dbUrl, '| DB host:', dbUrl ? new URL(dbUrl).hostname : 'MISSING');

@@ -1,9 +1,9 @@
 import { Pool } from 'pg';
 
-const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || '';
+const dbUrl = process.env.SUPABASE_DB_URL || '';
 
 if (!dbUrl) {
-  console.error('ERROR: No database URL configured. Set SUPABASE_DB_URL or DATABASE_URL.');
+  console.error('ERROR: SUPABASE_DB_URL is not set.');
 }
 
 const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1') || dbUrl.includes('helium');
