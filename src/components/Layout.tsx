@@ -24,7 +24,7 @@ export function Layout() {
       /* ignore */}
   }, [collapsed]);
   return (
-    <div className="min-h-screen bg-[#F8FAFB] dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-100 selection:bg-green-200 selection:text-green-900 transition-colors duration-200">
+    <div className="min-h-screen bg-[#F8FAFB] font-sans text-slate-800 selection:bg-green-200 selection:text-green-900">
       <Navbar
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed((c) => !c)} />
@@ -62,18 +62,18 @@ export function Layout() {
         </main>
 
         {!isMapPage &&
-        <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700/60 py-6 sm:py-8 mt-auto transition-colors duration-200">
+        <footer className="bg-white border-t border-slate-200 py-6 sm:py-8 mt-auto">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-md bg-[#E76F51] flex items-center justify-center text-white shadow-sm">
                   <PawPrint size={14} />
                 </div>
-                <span className="font-semibold text-slate-900 dark:text-white text-sm">
+                <span className="font-semibold text-slate-900 text-sm">
                   StrayPaw Alert
                 </span>
               </div>
 
-              <div className="text-center md:text-right text-sm text-slate-500 dark:text-slate-400">
+              <div className="text-center md:text-right text-sm text-slate-500">
                 <p>
                   &copy; {new Date().getFullYear()} Tago Municipality, Surigao
                   del Sur.
