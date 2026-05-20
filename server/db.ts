@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 
-const dbUrl = process.env.DATABASE_URL || '';
+const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || '';
 const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1') || dbUrl.includes('helium');
 
 const pool = new Pool({
