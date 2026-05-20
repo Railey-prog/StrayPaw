@@ -62,4 +62,3 @@ run = ["npm", "run", "start"]
 [userenv]
 
 [userenv.shared]
-JWT_SECRET = "a465b08a1367a6ca2b18996f362a4e6edee631b837fb1805490af9bda057ccd24a67fd753a920188dc71511ff41caf9a"
