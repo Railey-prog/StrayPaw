@@ -85,6 +85,7 @@ export function App() {
                 <Route path="/report" element={<ReportForm />} />
                 <Route path="/reports" element={<ReportsList />} />
                 <Route path="/reports/:id" element={<ReportDetail />} />
+                <Route path="/reports/:id/edit" element={<ReportForm />} />
                 <Route path="/my-reports" element={<MyReports />} />
                 <Route
                   path="/admin"

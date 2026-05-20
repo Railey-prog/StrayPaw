@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, Upload, CheckCircle, AlertCircle, MapPin, XCircle } from 'lucide-react';
 import { useReports } from '../context/ReportContext';
@@ -14,7 +14,9 @@ import {
 
 export function ReportForm() {
   const navigate = useNavigate();
-  const { addReport } = useReports();
+  const { id: editId } = useParams<{ id?: string }>();
+  const isEditMode = Boolean(editId);
+  const { addReport, editReport, reports } = useReports();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
@@ -33,20 +35,32 @@ export function ReportForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (isEditMode && editId) {
+      const existing = reports.find((r) => r.id === editId);
+      if (existing) {
+        setFormData({
+          reporter_name: existing.reporter_name || '',
+          animal_type: existing.animal_type,
+          condition_tag: existing.condition_tag,
+          description: existing.description,
+          barangay: existing.barangay,
+        });
+        setPhotoUrl(existing.photo_url);
+        setPosition([existing.latitude, existing.longitude]);
+        if (existing.animal_type === 'other') {
+          setOtherAnimalType(existing.other_animal_type || '');
+        }
+      }
+    }
+  }, [isEditMode, editId, reports]);
+
   const handlePositionChange = (pos: [number, number]) => {
     setPosition(pos);
-    // Always auto-fill the nearest barangay — no restrictions during usage
     const nearest = findNearestBarangay(pos[0], pos[1]);
     if (nearest) {
-      setFormData((prev) => ({
-        ...prev,
-        barangay: nearest
-      }));
-      setErrors((prev) => ({
-        ...prev,
-        barangay: '',
-        location: ''
-      }));
+      setFormData((prev) => ({ ...prev, barangay: nearest }));
+      setErrors((prev) => ({ ...prev, barangay: '', location: '' }));
     }
   };
 
@@ -54,19 +68,13 @@ export function ReportForm() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setErrors({
-          ...errors,
-          photo: 'Image must be less than 5MB'
-        });
+        setErrors({ ...errors, photo: 'Image must be less than 5MB' });
         return;
       }
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoUrl(reader.result as string);
-        setErrors({
-          ...errors,
-          photo: ''
-        });
+        setErrors({ ...errors, photo: '' });
       };
       reader.readAsDataURL(file);
     }
@@ -74,21 +82,17 @@ export function ReportForm() {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.description.trim())
-      newErrors.description = 'Description is required';
+    if (!formData.description.trim()) newErrors.description = 'Description is required';
     if (formData.animal_type === 'other' && !otherAnimalType.trim())
       newErrors.other_animal_type = 'Please specify the animal type';
     if (!photoUrl) newErrors.photo = 'A photo is required';
-    if (!position) {
-      newErrors.location = 'Please tap "Use My Location" to set the location';
-    }
+    if (!position) newErrors.location = 'Please tap "Use My Location" to set the location';
     if (!formData.barangay) newErrors.barangay = 'Please select a barangay';
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return false;
     }
-    // Location coverage check — only at submission time
     if (position && !isWithinTago(position[0], position[1])) {
       setShowOutOfBoundsModal(true);
       return false;
@@ -101,18 +105,21 @@ export function ReportForm() {
     if (!validate()) return;
     setIsSubmitting(true);
     try {
-      const newId = await addReport(
-        {
-          ...formData,
-          reporter_name: formData.reporter_name || user?.username || '',
-          other_animal_type: formData.animal_type === 'other' ? otherAnimalType.trim() : undefined,
-          photo_url: photoUrl,
-          latitude: position![0],
-          longitude: position![1]
-        },
-        user?.id
-      );
-      setSuccessId(newId);
+      const payload = {
+        ...formData,
+        reporter_name: formData.reporter_name || user?.username || '',
+        other_animal_type: formData.animal_type === 'other' ? otherAnimalType.trim() : undefined,
+        photo_url: photoUrl,
+        latitude: position![0],
+        longitude: position![1],
+      };
+      if (isEditMode && editId) {
+        await editReport(editId, payload);
+        navigate(`/reports/${editId}`);
+      } else {
+        const newId = await addReport(payload, user?.id);
+        setSuccessId(newId);
+      }
     } catch (err: any) {
       setErrors({ submit: err.message || 'Failed to submit report. Please try again.' });
     } finally {
@@ -129,9 +136,7 @@ export function ReportForm() {
         <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
           <CheckCircle className="w-12 h-12 text-emerald-500" />
         </div>
-        <h2 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">
-          Report Submitted!
-        </h2>
+        <h2 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">Report Submitted!</h2>
         <p className="text-slate-600 mb-8 leading-relaxed">
           Thank you for helping the community. Your report ID is <br />
           <strong className="font-mono text-lg text-slate-900 bg-slate-100 px-3 py-1 rounded-lg mt-2 inline-block">
@@ -156,7 +161,6 @@ export function ReportForm() {
 
   return (
     <>
-      {/* Out-of-bounds modal */}
       <AnimatePresence>
         {showOutOfBoundsModal && (
           <motion.div
@@ -175,13 +179,10 @@ export function ReportForm() {
               <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
                 <XCircle className="w-9 h-9 text-red-500" />
               </div>
-              <h3 className="text-xl font-extrabold text-slate-900 mb-2 tracking-tight">
-                Outside Coverage Area
-              </h3>
+              <h3 className="text-xl font-extrabold text-slate-900 mb-2 tracking-tight">Outside Coverage Area</h3>
               <p className="text-slate-600 text-sm leading-relaxed mb-6">
                 Reporting is not available in your current location. StrayPaw Alert only accepts reports within the{' '}
                 <span className="font-semibold text-slate-800">24 barangays of Tago, Surigao del Sur</span>.
-                Please move to a covered area to submit a report.
               </p>
               <button
                 onClick={() => setShowOutOfBoundsModal(false)}
@@ -196,11 +197,12 @@ export function ReportForm() {
       <div className="max-w-3xl mx-auto py-12 px-4 sm:px-6 w-full">
         <div className="mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-3 tracking-tight">
-            Report a Stray
+            {isEditMode ? 'Edit Report' : 'Report a Stray'}
           </h1>
           <p className="text-slate-600 text-lg">
-            Your report helps barangay officials locate and assist animals in
-            need.
+            {isEditMode
+              ? 'Update the details of your report below.'
+              : 'Your report helps barangay officials locate and assist animals in need.'}
           </p>
         </div>
 
@@ -210,17 +212,20 @@ export function ReportForm() {
           className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
 
           <form onSubmit={handleSubmit} className="p-6 sm:p-10 space-y-10">
+            {errors.submit && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2 text-red-700 text-sm font-medium">
+                <AlertCircle size={16} /> {errors.submit}
+              </div>
+            )}
+
             {/* Section 1: Photo */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">
-                  1
-                </div>
+                <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">1</div>
                 <h2 className="text-lg font-bold text-slate-900">Upload Photo</h2>
               </div>
-
               <div>
-                {photoUrl &&
+                {photoUrl && (
                   <div className="relative w-full h-64 rounded-2xl overflow-hidden mb-4 group border-2 border-transparent hover:border-white/20 transition-all">
                     <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
@@ -230,54 +235,47 @@ export function ReportForm() {
                     </div>
                     <div className="absolute inset-0 cursor-pointer" onClick={() => fileInputRef.current?.click()} />
                   </div>
-                }
-
-                {!photoUrl &&
+                )}
+                {!photoUrl && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className={`flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer group ${errors.photo ? 'border-red-500/50 bg-red-500/5 hover:bg-red-500/10' : 'border-white/20 hover:border-[#A3E635]/50 hover:bg-white/5'}`}>
-                      <div className="w-14 h-14 bg-white/5 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform border border-white/10">
-                        <Upload size={24} className="text-zinc-400 group-hover:text-[#A3E635] transition-colors" />
+                      className={`flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer group ${errors.photo ? 'border-red-500/50 bg-red-500/5 hover:bg-red-500/10' : 'border-slate-300 hover:border-[#2D6A4F]/50 hover:bg-slate-50'}`}>
+                      <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                        <Upload size={24} className="text-slate-400 group-hover:text-[#2D6A4F] transition-colors" />
                       </div>
-                      <p className="font-bold text-white text-base mb-1">Upload Photo</p>
-                      <p className="text-sm text-zinc-500">From gallery or files</p>
+                      <p className="font-bold text-slate-700 text-base mb-1">Upload Photo</p>
+                      <p className="text-sm text-slate-400">From gallery or files</p>
                     </button>
-
                     <button
                       type="button"
                       onClick={() => cameraInputRef.current?.click()}
-                      className={`flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer group ${errors.photo ? 'border-red-500/50 bg-red-500/5 hover:bg-red-500/10' : 'border-white/20 hover:border-[#A3E635]/50 hover:bg-white/5'}`}>
-                      <div className="w-14 h-14 bg-[#A3E635]/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform border border-[#A3E635]/20">
-                        <Camera size={24} className="text-[#A3E635]" />
+                      className={`flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer group ${errors.photo ? 'border-red-500/50 bg-red-500/5 hover:bg-red-500/10' : 'border-slate-300 hover:border-[#2D6A4F]/50 hover:bg-slate-50'}`}>
+                      <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                        <Camera size={24} className="text-[#2D6A4F]" />
                       </div>
-                      <p className="font-bold text-white text-base mb-1">Take a Picture</p>
-                      <p className="text-sm text-zinc-500">Use your camera</p>
+                      <p className="font-bold text-slate-700 text-base mb-1">Take a Picture</p>
+                      <p className="text-sm text-slate-400">Use your camera</p>
                     </button>
                   </div>
-                }
-
+                )}
                 <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/jpeg, image/png, image/webp" className="hidden" />
                 <input type="file" ref={cameraInputRef} onChange={handlePhotoUpload} accept="image/jpeg, image/png, image/webp" capture="environment" className="hidden" />
-
-                {errors.photo &&
+                {errors.photo && (
                   <p className="text-red-500 text-sm mt-2 flex items-center gap-1 font-medium">
                     <AlertCircle size={14} /> {errors.photo}
                   </p>
-                }
+                )}
               </div>
             </div>
 
             {/* Section 2: Details */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">
-                  2
-                </div>
+                <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">2</div>
                 <h2 className="text-lg font-bold text-slate-900">Animal Details</h2>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-bold text-slate-700">Animal Type</label>
@@ -327,7 +325,6 @@ export function ReportForm() {
                   </select>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <label className="block text-sm font-bold text-slate-700">Description</label>
                 <textarea
@@ -336,34 +333,30 @@ export function ReportForm() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className={`w-full bg-slate-50 border rounded-xl px-4 py-3.5 text-slate-700 focus:outline-none focus:ring-2 focus:bg-white transition-all resize-none ${errors.description ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' : 'border-slate-200 focus:ring-[#2D6A4F]/20 focus:border-[#2D6A4F]'}`} />
-                {errors.description &&
+                {errors.description && (
                   <p className="text-red-500 text-sm mt-1 flex items-center gap-1 font-medium">
                     <AlertCircle size={14} /> {errors.description}
                   </p>
-                }
+                )}
               </div>
             </div>
 
             {/* Section 3: Location */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">
-                  3
-                </div>
+                <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">3</div>
                 <h2 className="text-lg font-bold text-slate-900">Location</h2>
               </div>
-
               <div className="space-y-2">
                 <div className="bg-slate-50 p-2 rounded-2xl border border-slate-200">
                   <LocationPicker position={position} onChange={handlePositionChange} />
                 </div>
-                {errors.location &&
+                {errors.location && (
                   <p className="text-red-500 text-sm mt-1 flex items-center gap-1 font-medium">
                     <AlertCircle size={14} /> {errors.location}
                   </p>
-                }
+                )}
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-bold text-slate-700">Barangay</label>
@@ -377,21 +370,20 @@ export function ReportForm() {
                       className={`w-full pl-11 pr-4 py-3.5 bg-slate-50 border rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:bg-white transition-all appearance-none font-medium cursor-pointer ${errors.barangay ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' : 'border-slate-200 focus:ring-[#2D6A4F]/20 focus:border-[#2D6A4F]'}`}
                       style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 1rem center`, backgroundRepeat: `no-repeat`, backgroundSize: `1.5em 1.5em` }}>
                       <option value="">Select a barangay...</option>
-                      {TAGO_BARANGAYS.map((brgy) =>
+                      {TAGO_BARANGAYS.map((brgy) => (
                         <option key={brgy.name} value={brgy.name}>{brgy.name}</option>
-                      )}
+                      ))}
                     </select>
                   </div>
-                  {errors.barangay &&
+                  {errors.barangay && (
                     <p className="text-red-500 text-sm mt-1 flex items-center gap-1 font-medium">
                       <AlertCircle size={14} /> {errors.barangay}
                     </p>
-                  }
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="block text-sm font-bold text-slate-700">
-                    Your Name{' '}
-                    <span className="text-slate-400 font-normal">(Optional)</span>
+                    Your Name <span className="text-slate-400 font-normal">(Optional)</span>
                   </label>
                   <input
                     type="text"
@@ -403,18 +395,22 @@ export function ReportForm() {
               </div>
             </div>
 
-            <div className="pt-8 border-t border-slate-100">
+            <div className="pt-8 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
+              {isEditMode && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/reports/${editId}`)}
+                  className="sm:w-auto flex-1 bg-white border border-slate-200 text-slate-700 py-4 rounded-xl font-bold hover:bg-slate-50 transition-colors">
+                  Cancel
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-[#E76F51] hover:bg-[#d65d40] text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none flex justify-center items-center gap-2">
-                {isSubmitting ?
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>{' '}
-                    Submitting...
-                  </> :
-                  'Submit Report'
-                }
+                className="flex-1 bg-[#E76F51] hover:bg-[#d65d40] text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none flex justify-center items-center gap-2">
+                {isSubmitting ? (
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Saving...</>
+                ) : isEditMode ? 'Save Changes' : 'Submit Report'}
               </button>
             </div>
           </form>

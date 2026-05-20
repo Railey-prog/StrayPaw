@@ -49,6 +49,42 @@ router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM reports WHERE id=$1', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Report not found' });
+    const report = rows[0];
+    if (report.reporter_user_id !== req.userId && req.userRole !== 'admin') {
+      return res.status(403).json({ error: 'You can only edit your own reports' });
+    }
+    const {
+      reporter_name, animal_type, other_animal_type, condition_tag,
+      description, photo_url, latitude, longitude, barangay
+    } = req.body;
+    const result = await pool.query(
+      `UPDATE reports SET
+        reporter_name = COALESCE($1, reporter_name),
+        animal_type = COALESCE($2, animal_type),
+        other_animal_type = $3,
+        condition_tag = COALESCE($4, condition_tag),
+        description = COALESCE($5, description),
+        photo_url = COALESCE($6, photo_url),
+        latitude = COALESCE($7, latitude),
+        longitude = COALESCE($8, longitude),
+        barangay = COALESCE($9, barangay),
+        updated_at = NOW()
+       WHERE id=$10 RETURNING *`,
+      [reporter_name ?? null, animal_type ?? null, other_animal_type ?? null,
+       condition_tag ?? null, description ?? null, photo_url ?? null,
+       latitude ?? null, longitude ?? null, barangay ?? null, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Edit report error:', err);
+    res.status(500).json({ error: 'Failed to update report' });
+  }
+});
+
 router.patch('/bulk/status', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
   const { ids, status, admin_notes } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });

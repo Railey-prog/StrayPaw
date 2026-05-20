@@ -6,6 +6,7 @@ interface ReportContextType {
   reports: Report[];
   loading: boolean;
   addReport: (report: Omit<Report, 'id' | 'created_at' | 'updated_at' | 'status'>, userId?: string) => Promise<string>;
+  editReport: (id: string, data: Partial<Omit<Report, 'id' | 'created_at' | 'updated_at' | 'status'>>) => Promise<void>;
   updateReportStatus: (id: string, status: ReportStatus, notes?: string) => Promise<void>;
   deleteReport: (id: string) => Promise<void>;
   bulkUpdateStatus: (ids: string[], status: ReportStatus, notes?: string) => Promise<void>;
@@ -41,6 +42,11 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     return created.id;
   };
 
+  const editReport = async (id: string, data: Partial<Omit<Report, 'id' | 'created_at' | 'updated_at' | 'status'>>) => {
+    const updated = await api.patch<Report>(`/reports/${id}`, data);
+    setReports((prev) => prev.map((r) => (r.id === id ? updated : r)));
+  };
+
   const updateReportStatus = async (id: string, status: ReportStatus, notes?: string) => {
     const updated = await api.patch<Report>(`/reports/${id}/status`, { status, admin_notes: notes });
     setReports((prev) => prev.map((r) => (r.id === id ? updated : r)));
@@ -68,7 +74,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <ReportContext.Provider value={{ reports, loading, addReport, updateReportStatus, deleteReport, bulkUpdateStatus, bulkDelete, refreshReports }}>
+    <ReportContext.Provider value={{ reports, loading, addReport, editReport, updateReportStatus, deleteReport, bulkUpdateStatus, bulkDelete, refreshReports }}>
       {children}
     </ReportContext.Provider>
   );
