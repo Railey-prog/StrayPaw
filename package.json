@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "npx vite",
     "build": "npx vite build && npm run build:api",
-    "build:api": "npx esbuild api/_handler.ts --bundle --platform=node --target=node18 --outfile=api/index.js --format=cjs --external:pg-native",
+    "build:api": "npx esbuild api/_handler.ts --bundle --platform=node --target=node18 --outfile=api/index.js --format=cjs --external:pg-native --footer:js=\"module.exports=module.exports.default||module.exports;\"",
     "lint": "npx eslint . --ext .js,.jsx,.ts,.tsx",
     "preview": "npx vite preview",
     "server": "npx tsx watch server/index.ts",
